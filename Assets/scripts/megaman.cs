@@ -6,30 +6,30 @@ public class megaman : MonoBehaviour
 {
     [SerializeField] float speed;
     [SerializeField] float jumpforce;
-   // [SerializeField] float dashForce;
-    //[SerializeField] float dashSpeed;
+    //[SerializeField] float dashForce;
+    //[SerializeField] float dashForceMin;
+    //[SerializeField] float dashForceU;
+    //[SerializeField] float duracionDash;
 
     [SerializeField] BoxCollider2D misPies;
 
     Animator myAnimator;
     Rigidbody2D myBody;
     BoxCollider2D myCollider;
-    
-    float movDash = 1;
+
+    bool inicioSuelo;
     int salto = 1;
-    private float direccion;
-    private bool sale;
-    private bool alojandodireccion = true;
-    private float dashActual;
-    private bool canDash;
-    public float duracionDash;
-    public float dashSpeed;
-    public float dashcooldown;
+    
 
-   
+    //-----------------------------------------------------------mecanica dash
 
-
-
+    IEnumerator dashCoroutine;
+    float movDash = 1;
+    bool isDashing;
+    bool canDash=true;
+    private float direccion = 1;
+    float gravedadNormal;
+    
 
 
     // Start is called before the first frame update
@@ -39,6 +39,10 @@ public class megaman : MonoBehaviour
         myBody = GetComponent<Rigidbody2D>();
         myCollider = GetComponent<BoxCollider2D>();
         myBody.velocity = new Vector2(0, 0);
+        gravedadNormal = myBody.gravityScale; // mecanica del dash
+        
+      
+
 
     }
 
@@ -48,9 +52,42 @@ public class megaman : MonoBehaviour
         correr();
         saltar();
         caer();
-        Disparar();
-        dash();
+        enSuelo();
+        if(movDash!=0)
+        {
+            direccion = movDash;
+        }
+        if(Input.GetKeyDown(KeyCode.X)&&canDash==true&&enSuelo())
+        {
+            if (dashCoroutine != null)
+            {
+                StopCoroutine(dashCoroutine);
+            }
+            dashCoroutine = Dash(0.1f, 0);
+            StartCoroutine(dashCoroutine);
+            myAnimator.SetBool("dash", true);
+        }
+        if(Input.GetKey(KeyCode.X) && canDash == true && enSuelo())
+        {
+            if (dashCoroutine != null)
+            {
+                StopCoroutine(dashCoroutine);
+            }
+            dashCoroutine = Dash(0.3f, 1);
+            StartCoroutine(dashCoroutine);
+            myAnimator.SetBool("dash", true);
+        }
+
     }
+    private void FixedUpdate()
+    {
+        //algunos arreglos codigo dash (en especifico aqui es la fuerza de empuje)
+        if (isDashing)
+        {
+            myBody.AddForce(new Vector2(direccion*5, 0), ForceMode2D.Impulse);
+        }
+    }
+
     void correr()
     {
         float movH = Input.GetAxis("Horizontal");
@@ -67,7 +104,7 @@ public class megaman : MonoBehaviour
 
             myAnimator.SetBool("run", true);
             transform.Translate(new Vector2(movH * Time.deltaTime * speed, 0));
-            movDash = movH;
+            movDash = movH;// importante para que el dash sirva 
         }
         else
         {
@@ -75,6 +112,7 @@ public class megaman : MonoBehaviour
         }
 
     }
+   
 
 
 
@@ -83,37 +121,28 @@ public class megaman : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            if (enSuelo() && salto == 0)
+            enSuelo();
+            if (inicioSuelo == true && salto == 1)
             {
+                saltarHeroe();
+                salto = 2;
+            }
+            else if (inicioSuelo == true && salto == 2)
+            {
+                saltarHeroe();
                 salto = 1;
-            }
-            else if (enSuelo() && salto == 2)
-            {
-                salto = 0;
-            }
-            else if (!enSuelo() && salto == 0)
-            {
-                salto = 0;
-            }
-            else if (!enSuelo() && salto == 1)
-            {
-                salto = 0;
+                inicioSuelo = false;
             }
 
 
-            {
-                if (enSuelo() && salto == 1)
-                {
-                    saltarHeroe();
-                    salto = 2;
-                }
-                else if (!enSuelo() && salto == 2)
-                {
-                    saltarHeroe();
-                    salto = 0;
-                }
-            }
+
+
         }
+    }
+
+    void contadorSalto()
+    {
+        salto = 0;
     }
 
     void saltarHeroe()
@@ -137,72 +166,38 @@ public class megaman : MonoBehaviour
 
     bool enSuelo()
     {
-        return (misPies.IsTouchingLayers(LayerMask.GetMask("ground")));
+        if (misPies.IsTouchingLayers(LayerMask.GetMask("ground")))
+        {
+            inicioSuelo = true;
+        }
+        else
+        {
+            inicioSuelo = false;
+        }
+
+        return inicioSuelo;
     }
-
-    void dash()
+     /*concatenador para que sirva el dash donde se definen los parametros para modificarlos
+        arriba de la duracion y el cool down del dash*/
+    IEnumerator Dash(float duracionDash,float dashCooldown)
     {
-        if (Input.GetKeyDown(KeyCode.X)&& sale &&canDash)
-        {
-            if (dashActual<=0)
-            {
-                stopdash();
-            }
-            else
-            {
-                myAnimator.SetBool("dash", true);
-                dashActual -= Time.deltaTime;
-                if (alojandodireccion)
-                    myBody.velocity = Vector2.right * dashSpeed;
-                else
-                    myBody.velocity = Vector2.left * dashSpeed;
-            }
-        }
-        if (Input.GetKeyDown(KeyCode.X))
-        {
-            myAnimator.SetBool("dash", false);
-            canDash = true;
-            dashActual = duracionDash;
-        }
-       /* --------------codigo previo al que esta , el que servia en clase 
-        * float dashForceGo = 0;
-        if (Input.GetKey(KeyCode.X) && enSuelo() && movDash != 0)
-        {
-
-            if (movDash < 0)
-            {
-                dashForceGo = -dashForce;
-            }
-            else
-            {
-                dashForceGo = dashForce;
-            }
-            myBody.AddForce(new Vector2(dashForceGo, 0));
-            this.myAnimator.SetTrigger("dash");
-        }
-       
-       
-        }*/
-
-    }
-    void stopdash()
-    {
-        myBody.velocity = Vector2.zero;
-        dashActual = duracionDash;
-        myAnimator.SetBool("dash", false);
+        Vector2 velocidadOriginal = myBody.velocity;
+        isDashing = true;
         canDash = false;
-
-
+        myAnimator.SetBool("dash", true);
+        myBody.gravityScale = 0;
+        myBody.velocity = Vector2.zero;
+        yield return new WaitForSeconds(duracionDash);
+        isDashing = false;
+        myAnimator.SetBool("dash", false);
+        myBody.gravityScale = gravedadNormal;
+        myBody.velocity = velocidadOriginal;
+        yield return new WaitForSeconds(dashCooldown);
+        canDash = true;
     }
-    
 
-   
 
-    void Disparar()
-    {
-        if (Input.GetKeyDown(KeyCode.Q))
-        {
-            this.myAnimator.SetLayerWeight(1, 1);
-        }
-    }
+
+
+
 }
